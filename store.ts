@@ -6,7 +6,7 @@
 // ids come from monotonic counters, so two runs fed the same requests behave the
 // same way.
 
-import { buildCommit, buildTree, collectReachable, hashObject, isObjectId, parseCommit, parseTag, parseTree, ZERO_OID, type GitObject, type TreeEntry } from './gitobj.ts';
+import { collectReachableStopAtShallow, buildCommit, buildTree, collectReachable, hashObject, isObjectId, parseCommit, parseTag, parseTree, ZERO_OID, type GitObject, type TreeEntry } from './gitobj.ts';
 
 /** The login the trial's bearer token names (the scenario's viewer, derived from the kit's fixed scenario seed). */
 export const VIEWER_LOGIN = process.env.MAKEFUN_VIEWER_LOGIN ?? 'adaiversen';
@@ -479,7 +479,13 @@ export class Store {
   }
 
   /** All objects reachable from `roots` that are not reachable from `exclude`. */
-  objectsForFetch(repo: Repo, wants: readonly string[], exclude: readonly string[], depth?: number): { objects: GitObject[]; shallow: string[]; unshallow: string[] } {
+  objectsForFetch(
+    repo: Repo,
+    wants: readonly string[],
+    exclude: readonly string[],
+    depth?: number,
+    shallow: readonly string[] = [],
+  ): { objects: GitObject[]; shallow: string[]; unshallow: string[] } {
     const lookup = this.lookup(repo);
     // Depth-limited commit set: BFS from wants, at most `depth` generations.
     let includedCommits: Set<string> | null = null;
@@ -532,10 +538,15 @@ export class Store {
       return collectReachable(roots, lookup);
     };
     const wanted = reachable(wants);
+    // A have that is also a shallow boundary is held only up to itself: the
+    // client has that commit and its tree, but none of the history behind it,
+    // so a deepen fetch must still deliver its parent. A plain have is held
+    // with its whole history.
     const held = new Set<string>();
+    const shallowSet = new Set(shallow);
     for (const oid of exclude) {
       try {
-        for (const reachableOid of collectReachable([oid], lookup)) held.add(reachableOid);
+        for (const reachableOid of collectReachableStopAtShallow([oid], lookup, shallowSet)) held.add(reachableOid);
       } catch {
         // An unknown have is not held.
       }

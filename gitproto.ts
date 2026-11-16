@@ -152,7 +152,7 @@ function lsRefsResponse(repo: Repo, args: { peel: boolean; symrefs: boolean; unb
 }
 
 function fetchResponse(store: Store, repo: Repo, args: FetchArgs): Buffer {
-  const { objects, shallow } = store.objectsForFetch(repo, args.wants, args.haves, args.depth);
+  const { objects, shallow } = store.objectsForFetch(repo, args.wants, args.haves, args.depth, args.shallow);
   // unshallow: an old shallow boundary is unshallowed when the fetch delivered it
   // and every parent of it too (its history is no longer cut off there).
   const computedUnshallow: string[] = [];
@@ -186,7 +186,7 @@ function fetchResponse(store: Store, repo: Repo, args: FetchArgs): Buffer {
 }
 
 function fetchV0Response(store: Store, repo: Repo, args: FetchArgs): Buffer {
-  const { objects, shallow } = store.objectsForFetch(repo, args.wants, args.haves, args.depth);
+  const { objects, shallow } = store.objectsForFetch(repo, args.wants, args.haves, args.depth, args.shallow);
   const pack = writePack(objects);
   const parts: Buffer[] = [encodePktLine('NAK\n')];
   for (const oid of shallow) parts.push(encodePktLine(`shallow ${oid}\n`));

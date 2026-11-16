@@ -257,6 +257,44 @@ export function collectReachable(roots: Iterable<string>, lookup: (oid: string) 
   return seen;
 }
 
+/**
+ * Like collectReachable, but a commit in `shallow` is a boundary: the commit itself
+ * and its tree are included, its parents are not followed. A shallow clone's
+ * boundary commit is exactly such a have — the client holds the commit but none
+ * of the history behind it, so a deepen fetch must still deliver the parent.
+ */
+export function collectReachableStopAtShallow(
+  roots: Iterable<string>,
+  lookup: (oid: string) => GitObject | undefined,
+  shallow: ReadonlySet<string>,
+): Set<string> {
+  const seen = new Set<string>();
+  const queue: string[] = [];
+  for (const root of roots) if (isObjectId(root)) queue.push(root);
+  while (queue.length) {
+    const oid = queue.pop()!;
+    if (seen.has(oid)) continue;
+    const object = lookup(oid);
+    if (!object) throw new Error(`object ${oid} is missing from the store`);
+    seen.add(oid);
+    if (object.type === 'commit') {
+      const commit = parseCommit(object.data);
+      queue.push(commit.tree);
+      if (!shallow.has(oid)) {
+        for (const parent of commit.parents) queue.push(parent);
+      }
+    } else if (object.type === 'tag') {
+      queue.push(parseTag(object.data).object);
+    } else if (object.type === 'tree') {
+      for (const entry of parseTree(object.data)) {
+        if (entry.mode === '160000') continue;
+        queue.push(entry.oid);
+      }
+    }
+  }
+  return seen;
+}
+
 // ---------------------------------------------------------------------------------------------
 // packfile
 // ---------------------------------------------------------------------------------------------

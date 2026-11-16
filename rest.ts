@@ -102,7 +102,9 @@ function commitJson(store: Store, repo: Repo, sha: string): Json | null {
     sha,
     node_id: globalId('Repository', repo.id),
     commit: {
-      message: commit.message,
+      // The stored object ends its message with "\n" (as a real git object does);
+      // the API presents the message without that trailing newline.
+      message: commit.message.replace(/\n+$/, ''),
       author: { name: VIEWER_NAME, email: VIEWER_EMAIL, date: stamp },
       committer: { name: VIEWER_NAME, email: VIEWER_EMAIL, date: stamp },
       tree: { sha: commit.tree },
@@ -222,7 +224,10 @@ export function handleRest(
         }
         return ok(repoJson(store, repo));
       }
-      if (method === 'DELETE') return { status: 204, body: null };
+      if (method === 'DELETE') {
+        store.deleteRepo(owner, name);
+        return { status: 204, body: null };
+      }
       return err(404, 'Not Found');
     }
 
