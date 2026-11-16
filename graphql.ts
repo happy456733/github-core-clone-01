@@ -63,7 +63,10 @@ class ParseError extends Error {}
 
 class Lexer {
   private pos = 0;
-  constructor(private readonly src: string) {}
+  private readonly src: string;
+  constructor(src: string) {
+    this.src = src;
+  }
 
   private skipIgnored(): void {
     for (;;) {
